@@ -1,0 +1,40 @@
+{
+	"name": "@fylgja/fonts-provider",
+	"version": "1.0.0",
+	"description": "Self host web fonts from Fontsource, Google Fonts, Bunny Fonts and Fontshare, with metric adjusted fallbacks.",
+	"homepage": "https://fylgja.dev/",
+	"author": "Fylgja",
+	"license": "MIT",
+	"type": "module",
+	"main": "index.js",
+	"exports": {
+		".": "./index.js"
+	},
+	"files": [
+		"index.js",
+		"src"
+	],
+	"engines": {
+		"node": ">=20"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/fylgja/js-fonts-provider"
+	},
+	"bugs": "https://github.com/fylgja/js-fonts-provider/issues",
+	"keywords": [
+		"fylgja",
+		"css",
+		"fonts",
+		"webfonts",
+		"font-face",
+		"self-hosted",
+		"fontsource",
+		"google-fonts",
+		"bunny-fonts",
+		"fontshare"
+	],
+	"scripts": {
+		"test": "node --test tests/*.test.js"
+	}
+}

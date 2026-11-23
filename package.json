@@ -1,6 +1,6 @@
 {
 	"name": "@fylgja/fonts-provider",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"description": "Self host web fonts from Fontsource, Google Fonts, Bunny Fonts and Fontshare, with metric adjusted fallbacks.",
 	"homepage": "https://fylgja.dev/",
 	"author": "Fylgja",

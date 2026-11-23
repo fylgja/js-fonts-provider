@@ -20,7 +20,7 @@ A [PHP version](https://github.com/fylgja/php-fonts-provider) with the same API 
 npm install @fylgja/fonts-provider
 ```
 
-Requires Node 20 or newer.
+Requires Node 22 or newer.
 
 ## Usage
 

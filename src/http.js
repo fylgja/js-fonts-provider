@@ -12,6 +12,9 @@ const MAX_BYTES = 20 * 1024 * 1024;
 /** A failed request or a 429 or 5xx response is tried this many times in all, `delay` milliseconds apart. */
 export const RETRY = { attempts: 3, delay: 500 };
 
+/** Milliseconds the default fetch waits for a connection or data before it gives up. */
+const TIMEOUT = 30_000;
+
 /**
  * Addresses a request may not go to: private, loopback, link local (such as
  * 169.254.169.254), CGNAT, multicast and reserved IPv4, and IPv6 outside
@@ -111,7 +114,7 @@ export function createFetch(fetcher, allowPrivateAddresses) {
 
 		return new Promise((resolve, reject) => {
 			const options = { headers: init.headers, signal: init.signal, agent: allowPrivateAddresses ? undefined : publicAgent };
-			https.get(url, options, (response) => {
+			const request = https.get(url, options, (response) => {
 				const empty = [204, 304].includes(response.statusCode);
 				if (empty) response.resume();
 				resolve(new Response(empty ? null : Readable.toWeb(response), {
@@ -119,6 +122,7 @@ export function createFetch(fetcher, allowPrivateAddresses) {
 					headers: Object.entries(response.headers).flatMap(([name, value]) => [value].flat().map((item) => [name, item])),
 				}));
 			}).on("error", reject);
+			request.setTimeout(TIMEOUT, () => request.destroy(new Error(`no response within ${TIMEOUT / 1000} seconds`)));
 		});
 	};
 }

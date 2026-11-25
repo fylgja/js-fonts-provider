@@ -4,7 +4,7 @@
 import { normalizeFonts } from "./config.js";
 import { buildFallbackFace, pickFallback } from "./fallback.js";
 import { extension, isFontFile } from "./format.js";
-import { request } from "./http.js";
+import { createFetch, request } from "./http.js";
 import { readMetrics } from "./metrics.js";
 import { createProviders, defaultProviders } from "./providers/index.js";
 import { ConfigError, Result, WarningError } from "./result.js";
@@ -23,8 +23,9 @@ import { localStorage } from "./storage.js";
  * @property {boolean} [force] - download every file again, even when it is present
  * @property {boolean} [strict] - throw a `WarningError` when there are warnings
  * @property {number} [maxFileSize] - a larger font file is refused
+ * @property {boolean} [allowPrivateAddresses] - also request hosts with private, loopback and other non public addresses
  * @property {Provider[]} [providers] - defaults to `defaultProviders()`
- * @property {typeof fetch} [fetch] - defaults to the global `fetch`
+ * @property {typeof fetch|null} [fetch] - such as one for a proxy, defaults to a `node:https` client
  */
 
 /**
@@ -58,8 +59,9 @@ export async function generate(fonts, {
 	force = false,
 	strict = false,
 	maxFileSize = 10 * 1024 * 1024,
+	allowPrivateAddresses = false,
 	providers = defaultProviders(),
-	fetch = globalThis.fetch,
+	fetch = null,
 } = {}) {
 	const registry = createProviders(providers);
 	const config = normalizeFonts(fonts, registry);
@@ -69,7 +71,7 @@ export async function generate(fonts, {
 
 	const context = {
 		storage: typeof storage === "string" ? localStorage(storage) : storage,
-		fetch,
+		fetch: createFetch(fetch, allowPrivateAddresses),
 	};
 	const warnings = [];
 

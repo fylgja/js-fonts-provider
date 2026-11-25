@@ -2,11 +2,23 @@
 // Licensed under MIT Open Source
 
 import { createHash } from "node:crypto";
+import dns from "node:dns";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 const FIXTURES = new URL("../fixtures/", import.meta.url);
+
+/** Addresses by host for the fake DNS, every other host resolves to a public address. */
+export const hosts = {};
+
+// Tests never look up a name, the address check runs on these answers.
+// Recording needs the real DNS to reach the live API.
+if (!process.env.FONTS_RECORD) {
+	dns.lookup = (host, options, callback) => {
+		callback(null, (hosts[host] ?? ["8.8.8.8"]).map((address) => ({ address, family: address.includes(":") ? 6 : 4 })));
+	};
+}
 
 /** Fontshare fonts may not be redistributed, an OFL font of the same format is stored instead. */
 const SUBSTITUTE_HOSTS = ["cdn.fontshare.com"];
@@ -77,7 +89,7 @@ async function record(url, init) {
  * A `fetch` on the recorded responses. Set `FONTS_RECORD=1` to record the
  * responses a new test needs from the live API.
  *
- * @param {{overrides?: Record<string, {status?: number, body?: string}>, offline?: boolean}} [options]
+ * @param {{overrides?: Record<string, {status?: number, headers?: Record<string, string>, body?: string}>, offline?: boolean}} [options]
  *   - responses by URL, before the fixtures, and whether every request fails
  * @returns {typeof fetch & {requests: string[]}}
  */
@@ -88,14 +100,14 @@ export function replayFetch({ overrides = {}, offline = false } = {}) {
 		if (offline) throw new Error("offline");
 
 		const fixture = overrides[url]
-			? { status: overrides[url].status ?? 200, body: Buffer.from(overrides[url].body ?? "") }
+			? { status: overrides[url].status ?? 200, headers: overrides[url].headers, body: Buffer.from(overrides[url].body ?? "") }
 			: load(url) ?? (process.env.FONTS_RECORD ? await record(url, init) : null);
 
 		if (fixture === null) {
 			throw new Error(`No fixture for ${url}, run the tests with FONTS_RECORD=1 to record it.`);
 		}
 
-		return new Response(fixture.body, { status: fixture.status });
+		return new Response(fixture.body, { status: fixture.status, headers: fixture.headers });
 	};
 	replay.requests = [];
 

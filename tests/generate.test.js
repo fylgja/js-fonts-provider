@@ -250,4 +250,17 @@ describe("generate", () => {
 		assert.equal(result.downloads[0].error, "the run reached its limit of 1000 bytes");
 		assert.deepEqual(fs.readdirSync(storage), []);
 	});
+
+	test("a file name two URLs map to is only used by the first", async () => {
+		const { result } = await run([
+			{ name: "Roboto", weights: [400] },
+			{ name: "Roboto", provider: "bunny-fonts", cssVariable: "--b", weights: [400, 700], styles: ["normal", "italic"] },
+		]);
+
+		assert.deepEqual(result.warnings, [
+			'Skipped https://fonts.bunny.net/roboto/files/roboto-latin-400-normal.woff2 for "Roboto", its file name roboto-latin-400-normal.woff2 is taken by https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-400-normal.woff2.',
+		]);
+		assert.equal(result.families[1].faces.length, 3);
+		assert.equal(result.downloads.length, 4);
+	});
 });

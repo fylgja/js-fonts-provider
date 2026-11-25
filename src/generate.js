@@ -88,19 +88,27 @@ export async function generate(fonts, {
 	});
 
 	// A variable font serves one file for every weight, so the same URL
-	// must map to a single local file instead of one copy per face.
+	// must map to a single local file instead of one copy per face. Two URLs
+	// mapping to the same name would overwrite each other instead.
 	const filesByUrl = new Map();
+	const urlsByFile = new Map();
 	const downloads = [];
 	const families = config.fonts.map((font, index) => {
 		const provider = registry.get(font.provider);
 		if (!provider.remote) return { font, faces: resolved[index] };
 
-		const faces = resolved[index].map((face) => {
+		const faces = resolved[index].flatMap((face) => {
 			if (!filesByUrl.has(face.url)) {
-				filesByUrl.set(face.url, downloadFileName(font, face));
-				downloads.push({ url: face.url, file: filesByUrl.get(face.url), provider });
+				const file = downloadFileName(font, face);
+				if (urlsByFile.has(file)) {
+					warnings.push(`Skipped ${face.url} for "${font.name}", its file name ${file} is taken by ${urlsByFile.get(file)}.`);
+					return [];
+				}
+				filesByUrl.set(face.url, file);
+				urlsByFile.set(file, face.url);
+				downloads.push({ url: face.url, file, provider });
 			}
-			return { ...face, files: [filesByUrl.get(face.url)] };
+			return [{ ...face, files: [filesByUrl.get(face.url)] }];
 		});
 
 		return { font, faces };

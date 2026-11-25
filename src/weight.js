@@ -13,9 +13,14 @@ import { toFloat } from "./format.js";
  * @property {string} slug
  */
 
+/** The lowest and highest weight CSS accepts. */
+export const MIN_WEIGHT = 1;
+export const MAX_WEIGHT = 1000;
+
 /**
  * Normalizes a weight. A range like "300 700", "300..700" or "300-700"
- * describes a variable font axis.
+ * describes a variable font axis. A value with more than two parts is kept
+ * as is, so validation refuses it instead of dropping a part.
  *
  * @param {number|string} weight
  * @returns {Weight}
@@ -24,7 +29,7 @@ export function normalizeWeight(weight) {
 	const value = String(weight).trim();
 	const range = value.split(/\s*(?:\.\.|\s|-)\s*/).filter(Boolean);
 
-	if (range.length > 1) {
+	if (range.length === 2) {
 		return {
 			api: `${range[0]}..${range[1]}`,
 			css: `${range[0]} ${range[1]}`,
@@ -33,6 +38,19 @@ export function normalizeWeight(weight) {
 	}
 
 	return { api: value, css: value, slug: value };
+}
+
+/**
+ * Whether a weight lies within the weights CSS accepts, with the lowest
+ * weight of a range first.
+ *
+ * @param {Weight} weight
+ * @returns {boolean}
+ */
+export function isInBounds(weight) {
+	const [min, max] = bounds(weight);
+
+	return min >= MIN_WEIGHT && max <= MAX_WEIGHT && (min < max || !isRange(weight));
 }
 
 /**

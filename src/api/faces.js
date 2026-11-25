@@ -3,6 +3,7 @@
 
 import { SAFE_VALUE } from "../config.js";
 import { formatNumber, isNumeric } from "../format.js";
+import { MAX_WEIGHT, MIN_WEIGHT } from "../weight.js";
 
 /**
  * A single `@font-face`, as a provider resolved it.
@@ -102,7 +103,8 @@ export function sortFaces(faces, subsets = []) {
 
 /**
  * Whether a face only holds values that are safe to print in a stylesheet
- * and a file name. A face that fails is dropped.
+ * and a file name, with a weight or a range of two weights CSS accepts.
+ * A face that fails is dropped.
  *
  * @param {Face} face
  * @returns {boolean}
@@ -110,6 +112,12 @@ export function sortFaces(faces, subsets = []) {
 export function isSafeFace(face) {
 	const values = [face.style, face.weight, face.stretch, face.unicodeRange];
 	if (values.some((value) => value !== null && !SAFE_VALUE.test(value))) {
+		return false;
+	}
+
+	const weights = face.weight.trim().split(/\s+/);
+	const inBounds = (weight) => isNumeric(weight) && Number(weight) >= MIN_WEIGHT && Number(weight) <= MAX_WEIGHT;
+	if (weights.length > 2 || !weights.every(inBounds)) {
 		return false;
 	}
 

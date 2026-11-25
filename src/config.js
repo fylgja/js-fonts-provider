@@ -2,7 +2,7 @@
 // Licensed under MIT Open Source
 
 import { fontFormat, slugify } from "./format.js";
-import { findOverlap, isRange, normalizeWeight, sortWeights } from "./weight.js";
+import { findOverlap, isInBounds, isRange, MAX_WEIGHT, MIN_WEIGHT, normalizeWeight, sortWeights } from "./weight.js";
 
 /** @typedef {import("./weight.js").Weight} Weight */
 
@@ -54,6 +54,9 @@ export const DISPLAY_VALUES = ["auto", "block", "swap", "fallback", "optional"];
 
 /** Values a provider or variant puts in a declaration as is, such as `font-stretch` or `unicode-range`. */
 export const SAFE_VALUE = /^[A-Za-z0-9 ,.%+?-]*$/;
+
+/** Completes the message for a weight out of bounds. */
+const WEIGHT_BOUNDS = `not a weight from ${MIN_WEIGHT} to ${MAX_WEIGHT}, or a range from low to high.`;
 
 /** Characters that would let a value break out of a CSS string or declaration. */
 const UNSAFE = /["\\<>{};\x00-\x1f\x7f]/;
@@ -288,6 +291,8 @@ function isSafe(family, label, errors) {
 	for (const weight of family.weights) {
 		if (!/^\d+(?:\.\.\d+)?$/.test(weight.api)) {
 			errors.push(`${label}.weights has "${weight.css}", which is not a number or a range of numbers.`);
+		} else if (!isInBounds(weight)) {
+			errors.push(`${label}.weights has "${weight.css}", which is ${WEIGHT_BOUNDS}`);
 		}
 	}
 
@@ -301,6 +306,8 @@ function isSafe(family, label, errors) {
 		const variantLabel = `${label}.variants[${index}]`;
 		if (!/^\d+(?: \d+)?$/.test(variant.weight.css)) {
 			errors.push(`${variantLabel}.weight "${variant.weight.css}" is not a number or a range of numbers.`);
+		} else if (!isInBounds(variant.weight)) {
+			errors.push(`${variantLabel}.weight "${variant.weight.css}" is ${WEIGHT_BOUNDS}`);
 		}
 		for (const key of ["style", "stretch", "unicodeRange"]) {
 			if (variant[key] !== null && !SAFE_VALUE.test(variant[key])) {

@@ -4,6 +4,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { generate, normalize } from "../index.js";
+import { parseFontFaces } from "../src/api/stylesheet.js";
 import { buildCss2Url } from "../src/providers/css2.js";
 import { replayFetch, tempDir } from "./support/replay.js";
 
@@ -101,5 +102,12 @@ describe("providers", () => {
 			buildCss2Url("https://fonts.googleapis.com/css2", font),
 			"https://fonts.googleapis.com/css2?family=Open+Sans%26x%3D1%23:wght@400&display=swap",
 		);
+	});
+
+	test("drops faces with a weight CSS does not accept", () => {
+		const face = (weight) => `/* latin */\n@font-face { font-weight: ${weight}; src: url(https://fonts.gstatic.com/a.woff2) format('woff2'); }`;
+		const faces = parseFontFaces(["400", "100 900", "0", "1001", "100 200 300", "bold"].map(face).join("\n"));
+
+		assert.deepEqual(faces.map((item) => item.weight), ["400", "100 900"]);
 	});
 });

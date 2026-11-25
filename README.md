@@ -85,12 +85,15 @@ When you keep the CSS of an earlier run, keep it when a run has warnings, so a p
 | `force` | `false` | Download every file again, even when it is present. |
 | `strict` | `false` | Throw a `WarningError` when there are warnings. |
 | `maxFileSize` | `10485760` | A larger font file is refused. |
+| `maxFiles` | `500` | Font files downloaded in one run, the rest fail with a warning. |
+| `maxTotalBytes` | `104857600` | Bytes of the font files downloaded in one run. |
+| `allowPrivateAddresses` | `false` | Also request hosts with private, loopback and other non public addresses, see [Requests](#requests). |
 | `providers` | `defaultProviders()` | The providers, see [Providers](#providers). |
-| `fetch` | `globalThis.fetch` | The `fetch` to make requests with, for a proxy or a test. |
+| `fetch` | built in | The `fetch` to make requests with, for a proxy or a test, see [Requests](#requests). |
 
 ## Configuration
 
-Each family is an object of options.
+Each family is an object of options, at most 50 per config.
 
 | Key | Default | |
 | --- | --- | --- |
@@ -98,8 +101,8 @@ Each family is an object of options.
 | `provider` | `"fontsource"` | `fontsource`, `google-fonts`, `bunny-fonts`, `fontshare` or `local`. |
 | `id` | slug of `name` | The id in the provider's URLs, for the rare family where it differs (Fontshare spells JetBrains Mono `jet-brains-mono`). |
 | `cssVariable` | `"--font-<slug>"` | The leading `--` is added when missing. Must be unique. |
-| `cssSelector` | the `cssSelector` option | Selector to declare the variable in. |
-| `weights` | `["400"]` | Single weights, or a range such as `"100 900"` (also `"100..900"` or `"100-900"`) for a variable font. |
+| `cssSelector` | the `cssSelector` option | Selector to declare the variable in, at most 200 characters, without backslashes or an unclosed quote. |
+| `weights` | `["400"]` | Single weights from 1 to 1000, or a range such as `"100 900"` (also `"100..900"` or `"100-900"`) for a variable font. |
 | `styles` | `["normal"]` | `normal` and `italic`. |
 | `subsets` | `["latin"]` | Ignored by Fontshare, which serves one file per family. |
 | `fallbacks` | `["sans-serif"]` | The rest of the font stack. |
@@ -134,6 +137,18 @@ const result = await generate(fonts, { providers });
 
 A provider with the same `id` replaces the earlier one.
 Adobe Fonts is not supported, since its license does not allow self hosting the files.
+
+## Requests
+
+The families can come from a form and the providers answer with URLs, so a request only goes to a host whose addresses are all public.
+A host that is, or resolves to, a private, loopback, link local (such as `169.254.169.254`), CGNAT, multicast, reserved or IPv4 mapped address is refused, and so is the family or file that needed it, with a warning.
+Set `allowPrivateAddresses: true` for a font mirror on an internal address.
+
+The built in `fetch` checks the addresses in its own DNS lookup, so the address it checks is the address it connects to. It gives up after 30 seconds without a response.
+A `fetch` you pass yourself, such as one for a proxy, gets the host checked before each request. It resolves the host again when it connects, which leaves a short window in which a changed DNS answer is not checked.
+
+Redirects are not followed, a redirect fails like any other response that is not a 2xx.
+A failed connection, a 429 or a 5xx response is tried twice more, half a second apart.
 
 ## Fallback metrics
 

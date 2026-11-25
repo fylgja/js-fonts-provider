@@ -22,7 +22,8 @@ This is the source of truth for [`fylgja/php-fonts-provider`](https://github.com
 
 - **No dependencies.** Node's `fetch`, `zlib` and `fs` cover everything.
 - **Everything printed is validated.** The families can come from a form, so any value that ends up in CSS, a file name or a URL is checked in `config.js` (config) or `isSafeFace()` (provider responses). Add a check for every new option.
-- **Downloads are checked.** https only, the provider's hosts (`allowsDownload()`), the woff2 signature and `maxFileSize`.
+- **Downloads are checked.** https only, the provider's hosts (`allowsDownload()`), the woff2 signature, `maxFileSize`, `maxFiles` and `maxTotalBytes`.
+- **Requests go to public addresses only.** `createFetch()` in `src/http.js` checks every request of a run, by any provider, and redirects are not followed.
 - **No request in `normalize()`.** Validation must work offline, so a form can show errors before anything is fetched.
 - **One family failing never fails the run.** It becomes a warning, unless `strict` is set.
 - **Deterministic output.** Requests run in parallel, but warnings, faces and downloads keep the order of the config.

@@ -23,6 +23,8 @@ import { localStorage } from "./storage.js";
  * @property {boolean} [force] - download every file again, even when it is present
  * @property {boolean} [strict] - throw a `WarningError` when there are warnings
  * @property {number} [maxFileSize] - a larger font file is refused
+ * @property {number} [maxFiles] - font files downloaded in one run
+ * @property {number} [maxTotalBytes] - bytes of the font files downloaded in one run
  * @property {boolean} [allowPrivateAddresses] - also request hosts with private, loopback and other non public addresses
  * @property {Provider[]} [providers] - defaults to `defaultProviders()`
  * @property {typeof fetch|null} [fetch] - such as one for a proxy, defaults to a `node:https` client
@@ -59,6 +61,8 @@ export async function generate(fonts, {
 	force = false,
 	strict = false,
 	maxFileSize = 10 * 1024 * 1024,
+	maxFiles = 500,
+	maxTotalBytes = 100 * 1024 * 1024,
 	allowPrivateAddresses = false,
 	providers = defaultProviders(),
 	fetch = null,
@@ -102,7 +106,16 @@ export async function generate(fonts, {
 		return { font, faces };
 	});
 
-	const records = await Promise.all(downloads.map((download) => downloadFile(download, context, { force, maxFileSize })));
+	// Files are counted in the order of the config, before any request, so
+	// which file goes over `maxFiles` does not depend on timing.
+	const present = await Promise.all(downloads.map(({ file }) => !force && context.storage.exists(file)));
+	const budget = { files: 0, bytes: 0, maxFiles, maxTotalBytes };
+	const records = await Promise.all(downloads.map(({ url, file, provider }, index) => {
+		if (present[index]) return { url, file, status: "present", error: null };
+		if (++budget.files > maxFiles) return { url, file, status: "failed", error: `the run reached its limit of ${maxFiles} font files` };
+
+		return downloadFile({ url, file, provider }, context, { maxFileSize, budget });
+	}));
 	const failed = new Map(records.filter((record) => record.status === "failed").map((record) => [record.file, `${record.url} (${record.error})`]));
 
 	const result = [];
@@ -174,14 +187,10 @@ export function downloadFileName(font, face) {
  *
  * @param {{url: string, file: string, provider: Provider}} download
  * @param {import("./providers/index.js").ResolveContext} context
- * @param {{force: boolean, maxFileSize: number}} options
+ * @param {{maxFileSize: number, budget: {bytes: number, maxTotalBytes: number}}} options
  * @returns {Promise<Download>}
  */
-async function downloadFile({ url, file, provider }, context, { force, maxFileSize }) {
-	if (!force && (await context.storage.exists(file))) {
-		return { url, file, status: "present", error: null };
-	}
-
+async function downloadFile({ url, file, provider }, context, { maxFileSize, budget }) {
 	const fail = (error) => ({ url, file, status: "failed", error });
 
 	if (!provider.allowsDownload(url)) {
@@ -193,6 +202,8 @@ async function downloadFile({ url, file, provider }, context, { force, maxFileSi
 
 		if (!response.ok) return fail(`HTTP ${response.status}`);
 		if (response.body.length > maxFileSize) return fail(`larger than ${maxFileSize} bytes`);
+		budget.bytes += response.body.length;
+		if (budget.bytes > budget.maxTotalBytes) return fail(`the run reached its limit of ${budget.maxTotalBytes} bytes`);
 		if (extension(file) === "woff2" && response.body.toString("latin1", 0, 4) !== "wOF2") {
 			return fail("not a woff2 file");
 		}

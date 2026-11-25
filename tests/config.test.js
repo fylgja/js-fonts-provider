@@ -90,6 +90,13 @@ describe("normalize", () => {
 		]);
 	});
 
+	test("refuses more than 50 families", () => {
+		const fonts = Array.from({ length: 51 }, (_, index) => ({ name: `Font ${index}` }));
+
+		assert.deepEqual(normalize(fonts).errors, ["The fonts may list at most 50 families, received 51."]);
+		assert.deepEqual(normalize(fonts.slice(0, 50)).errors, []);
+	});
+
 	test("slugifies names", () => {
 		assert.equal(slugify("JetBrains Mono"), "jetbrains-mono");
 		assert.equal(slugify("Señor Café"), "senor-cafe");

@@ -57,6 +57,9 @@ export const SAFE_VALUE = /^[A-Za-z0-9 ,.%+?-]*$/;
 
 export const MAX_SELECTOR_LENGTH = 200;
 
+/** Every family is a request, so a config from a form cannot keep a run busy. */
+export const MAX_FAMILIES = 50;
+
 /** Completes the message for a weight out of bounds. */
 const WEIGHT_BOUNDS = `not a weight from ${MIN_WEIGHT} to ${MAX_WEIGHT}, or a range from low to high.`;
 
@@ -74,6 +77,10 @@ const UNSAFE = /["\\<>{};\x00-\x1f\x7f]/;
 export function normalizeFonts(fonts, providers) {
 	if (!Array.isArray(fonts)) {
 		return { fonts: [], errors: ["The fonts must be a list of font families."], valid: false };
+	}
+
+	if (fonts.length > MAX_FAMILIES) {
+		return { fonts: [], errors: [`The fonts may list at most ${MAX_FAMILIES} families, received ${fonts.length}.`], valid: false };
 	}
 
 	const errors = [];

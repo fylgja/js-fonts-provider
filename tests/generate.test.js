@@ -236,4 +236,18 @@ describe("generate", () => {
 		await run(PACIFICO, { fetch: offline });
 		assert.equal(offline.requests.length, 3);
 	});
+
+	test("files over the limit are not downloaded", async () => {
+		const { result } = await run([{ name: "Roboto", weights: [400, 700] }], { maxFiles: 1 });
+
+		assert.deepEqual(result.downloads.map((download) => download.error), [null, "the run reached its limit of 1 font files"]);
+		assert.match(result.warnings[0], /^Could not download 1 font file\(s\) for "Roboto"\./);
+	});
+
+	test("bytes over the limit are not stored", async () => {
+		const { result, storage } = await run(PACIFICO, { maxTotalBytes: 1000 });
+
+		assert.equal(result.downloads[0].error, "the run reached its limit of 1000 bytes");
+		assert.deepEqual(fs.readdirSync(storage), []);
+	});
 });

@@ -223,4 +223,17 @@ describe("generate", () => {
 		assert.equal(result.downloads[0].error, "HTTP 302");
 		assert.ok(!fetch.requests.includes("https://evil.example/pacifico.woff2"));
 	});
+
+	test("tries a failed request twice more", async () => {
+		const fetch = replayFetch({ overrides: { [PACIFICO_FILE]: { status: 503 }, "https://api.fontsource.org/v1/fonts/roboto": { status: 404 } } });
+		const { result } = await run([...PACIFICO, { name: "Roboto" }], { fetch });
+
+		assert.equal(result.downloads[0].error, "HTTP 503");
+		assert.equal(fetch.requests.filter((url) => url === PACIFICO_FILE).length, 3);
+		assert.equal(fetch.requests.filter((url) => url.endsWith("/roboto")).length, 1);
+
+		const offline = replayFetch({ offline: true });
+		await run(PACIFICO, { fetch: offline });
+		assert.equal(offline.requests.length, 3);
+	});
 });

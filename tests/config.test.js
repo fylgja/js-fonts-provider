@@ -11,6 +11,9 @@ const UNSAFE = {
 	"css variable": [{ name: "Inter", cssVariable: "--font: red;" }, 'fonts[0].cssVariable "--font: red;" is not a valid custom property name.'],
 	"selector": [{ name: "Inter", cssSelector: ":root{}" }, "fonts[0].cssSelector contains characters that are not allowed in a selector."],
 	"comment in selector": [{ name: "Inter", cssSelector: ":root /*" }, "fonts[0].cssSelector contains characters that are not allowed in a selector."],
+	"backslash in selector": [{ name: "Inter", cssSelector: ".a\\7b" }, "fonts[0].cssSelector contains characters that are not allowed in a selector."],
+	"open quote in selector": [{ name: "Inter", cssSelector: "[data-font='a\"]" }, "fonts[0].cssSelector has a quote that is not closed."],
+	"long selector": [{ name: "Inter", cssSelector: `.${"a".repeat(200)}` }, "fonts[0].cssSelector is longer than 200 characters."],
 	"id": [{ name: "Inter", id: "../../etc" }, 'fonts[0].id "../../etc" may only contain letters, digits, "-" and "_".'],
 	"display": [{ name: "Inter", display: "swap;color:red" }, "fonts[0].display must be one of: auto, block, swap, fallback, optional."],
 	"fallback": [{ name: "Inter", fallbacks: ["sans-serif", "x;}"] }, "fonts[0].fallbacks has a value that is not a font family name: x;}."],
@@ -41,6 +44,12 @@ describe("normalize", () => {
 			assert.deepEqual(normalize([font]).errors, [error]);
 		});
 	}
+
+	test("accepts a selector with quoted attribute values", () => {
+		const config = normalize([{ name: "Inter", cssSelector: `[data-font="it's"] .${"a".repeat(180)}` }]);
+
+		assert.deepEqual(config.errors, []);
+	});
 
 	test("accepts quoted and named fallbacks", () => {
 		const config = normalize([{ name: "Inter", fallbacks: ['"Helvetica Neue"', "'Segoe UI'", "Arial", "system-ui"] }]);

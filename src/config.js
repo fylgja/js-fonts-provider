@@ -55,6 +55,8 @@ export const DISPLAY_VALUES = ["auto", "block", "swap", "fallback", "optional"];
 /** Values a provider or variant puts in a declaration as is, such as `font-stretch` or `unicode-range`. */
 export const SAFE_VALUE = /^[A-Za-z0-9 ,.%+?-]*$/;
 
+export const MAX_SELECTOR_LENGTH = 200;
+
 /** Completes the message for a weight out of bounds. */
 const WEIGHT_BOUNDS = `not a weight from ${MIN_WEIGHT} to ${MAX_WEIGHT}, or a range from low to high.`;
 
@@ -270,8 +272,14 @@ function isSafe(family, label, errors) {
 		errors.push(`${label}.cssVariable "${family.cssVariable}" is not a valid custom property name.`);
 	}
 
-	if (family.cssSelector !== null && /[{};<>\x00-\x1f\x7f]|\/\*/.test(family.cssSelector)) {
-		errors.push(`${label}.cssSelector contains characters that are not allowed in a selector.`);
+	if (family.cssSelector !== null) {
+		if (/[{};<>\\\x00-\x1f\x7f]|\/\*/.test(family.cssSelector)) {
+			errors.push(`${label}.cssSelector contains characters that are not allowed in a selector.`);
+		} else if (hasOpenQuote(family.cssSelector)) {
+			errors.push(`${label}.cssSelector has a quote that is not closed.`);
+		} else if ([...family.cssSelector].length > MAX_SELECTOR_LENGTH) {
+			errors.push(`${label}.cssSelector is longer than ${MAX_SELECTOR_LENGTH} characters.`);
+		}
 	}
 
 	if (!/^[A-Za-z0-9_-]*$/.test(family.id)) {
@@ -325,6 +333,26 @@ function isSafe(family, label, errors) {
 	});
 
 	return errors.length === count;
+}
+
+/**
+ * Whether a selector ends inside a quoted string, such as an attribute value,
+ * which would swallow the rest of the stylesheet.
+ *
+ * @param {string} selector - without backslashes, so a quote cannot be escaped
+ * @returns {boolean}
+ */
+function hasOpenQuote(selector) {
+	let quote = null;
+	for (const char of selector) {
+		if (quote === null && (char === '"' || char === "'")) {
+			quote = char;
+		} else if (char === quote) {
+			quote = null;
+		}
+	}
+
+	return quote !== null;
 }
 
 /**

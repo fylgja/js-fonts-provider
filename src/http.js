@@ -9,6 +9,9 @@ import { Readable } from "node:stream";
 /** A larger response is refused rather than read into memory. */
 const MAX_BYTES = 20 * 1024 * 1024;
 
+/** A failed request or a 429 or 5xx response is tried this many times in all, `delay` milliseconds apart. */
+export const RETRY = { attempts: 3, delay: 500 };
+
 /**
  * Addresses a request may not go to: private, loopback, link local (such as
  * 169.254.169.254), CGNAT, multicast and reserved IPv4, and IPv6 outside
@@ -128,7 +131,8 @@ export function createFetch(fetcher, allowPrivateAddresses) {
  */
 
 /**
- * Makes a GET request and reads the whole body.
+ * Makes a GET request and reads the whole body, trying again after a failed
+ * connection or a 429 or 5xx response.
  *
  * @param {typeof fetch} fetcher
  * @param {string} url
@@ -136,6 +140,24 @@ export function createFetch(fetcher, allowPrivateAddresses) {
  * @returns {Promise<HttpResponse>} any status, only a failed connection rejects
  */
 export async function request(fetcher, url, headers = {}) {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			const response = await requestOnce(fetcher, url, headers);
+			if (attempt >= RETRY.attempts || (response.status !== 429 && response.status < 500)) return response;
+		} catch (error) {
+			if (attempt >= RETRY.attempts || error.retry === false) throw error;
+		}
+		await new Promise((resolve) => setTimeout(resolve, RETRY.delay));
+	}
+}
+
+/**
+ * @param {typeof fetch} fetcher
+ * @param {string} url
+ * @param {Record<string, string>} headers
+ * @returns {Promise<HttpResponse>}
+ */
+async function requestOnce(fetcher, url, headers) {
 	const response = await fetcher(url, { headers, redirect: "manual" });
 	const chunks = [];
 	let size = 0;

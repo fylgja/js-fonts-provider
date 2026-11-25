@@ -7,7 +7,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { RETRY } from "../../src/http.js";
+
 const FIXTURES = new URL("../fixtures/", import.meta.url);
+
+RETRY.delay = 0;
 
 /** Addresses by host for the fake DNS, every other host resolves to a public address. */
 export const hosts = {};

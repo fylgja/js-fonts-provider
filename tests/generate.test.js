@@ -5,8 +5,9 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { ConfigError, generate, WarningError } from "../index.js";
-import { fixtureFont, replayFetch, tempDir } from "./support/replay.js";
+import { ConfigError, generate, googleFonts, WarningError } from "../index.js";
+import { createFetch } from "../src/http.js";
+import { fixtureFont, hosts, replayFetch, tempDir } from "./support/replay.js";
 
 const PACIFICO = [{ name: "pacifico", cssVariable: "--font-heading", cssSelector: ".page-title", weights: "400" }];
 const PACIFICO_FILE = "https://cdn.jsdelivr.net/fontsource/fonts/pacifico@latest/latin-400-normal.woff2";
@@ -167,5 +168,59 @@ describe("generate", () => {
 		const { result } = await run([{ provider: "local", name: "Brand", variants: [{ src: ["brand.woff2"] }] }]);
 
 		assert.match(result.warnings[0], /^Skipped "Brand", it could not be resolved\.\n {2}Missing font files for "Brand" in .+:\n {2}brand\.woff2$/);
+	});
+
+	test("refuses hosts with an address that is not public", async () => {
+		hosts["cdn.jsdelivr.net"] = ["8.8.8.8", "10.0.0.1"];
+		try {
+			const { result, fetch } = await run(PACIFICO);
+			assert.equal(result.downloads[0].error, "cdn.jsdelivr.net resolves to 10.0.0.1, which is not a public address");
+			assert.ok(!fetch.requests.includes(PACIFICO_FILE));
+
+			const allowed = await run(PACIFICO, { allowPrivateAddresses: true });
+			assert.equal(allowed.result.downloads[0].status, "downloaded");
+		} finally {
+			delete hosts["cdn.jsdelivr.net"];
+		}
+	});
+
+	test("refuses addresses that are not public, in any spelling", async () => {
+		const css = (host) => `/* latin */\n@font-face { src: url(https://${host}/inter.woff2) format('woff2'); }`;
+		const request = "https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap";
+		const errors = [];
+		for (const host of ["169.254.169.254", "0177.0.0.1", "2130706433", "100.64.0.1"]) {
+			const fetch = replayFetch({ overrides: { [request]: { body: css(host) } } });
+			const { result } = await run([{ name: "Inter", provider: "google-fonts" }], { fetch, providers: [googleFonts({ downloadHosts: [host] })] });
+			errors.push(result.downloads[0].error);
+		}
+
+		assert.deepEqual(errors, [
+			"169.254.169.254 is not a public address",
+			"127.0.0.1 is not a public address",
+			"127.0.0.1 is not a public address",
+			"100.64.0.1 is not a public address",
+		]);
+	});
+
+	test("the default fetch checks the address it connects to", async () => {
+		hosts["internal.example"] = ["192.168.1.10"];
+		try {
+			const fetch = createFetch(null, false);
+			await assert.rejects(fetch("https://internal.example/a.woff2"), { message: "internal.example resolves to 192.168.1.10, which is not a public address" });
+			await assert.rejects(fetch("https://[::1]/a.woff2"), { message: "::1 is not a public address" });
+			await assert.rejects(fetch("https://[::ffff:127.0.0.1]/"), { message: "::ffff:7f00:1 is not a public address" });
+			await assert.rejects(fetch("https://[fd00::1]/"), { message: "fd00::1 is not a public address" });
+			await assert.rejects(createFetch(replayFetch(), false)("https://internal.example/"), { message: "internal.example resolves to 192.168.1.10, which is not a public address" });
+		} finally {
+			delete hosts["internal.example"];
+		}
+	});
+
+	test("does not follow redirects", async () => {
+		const fetch = replayFetch({ overrides: { [PACIFICO_FILE]: { status: 302, headers: { location: "https://evil.example/pacifico.woff2" } } } });
+		const { result } = await run(PACIFICO, { fetch });
+
+		assert.equal(result.downloads[0].error, "HTTP 302");
+		assert.ok(!fetch.requests.includes("https://evil.example/pacifico.woff2"));
 	});
 });
